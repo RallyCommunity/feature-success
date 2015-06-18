@@ -1,9 +1,11 @@
 Ext.define('CustomApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
-    recommendationDropdownField: 'c_Recommendation',
+    featureRecommendationDropdownField: 'c_Recommendation',
+    initiativeRecommendationDropdownField: 'c_InitiativeRecommendation',
     recommendationSummaryField: 'c_RecommendationSummary',
     winnerField: 'c_Winner',
+    voteField: 'c_Votes',
     items: [
         {xtype:'container',itemId:'selector_box', padding: 10},
         {xtype:'container',itemId:'display_box', padding: 10}
@@ -11,7 +13,8 @@ Ext.define('CustomApp', {
     
     launch: function() {
         var me = this;
-        var feature_fields = ['FormattedID','Name','Notes','ConversationPost',this.recommendationDropdownField, this.winnerField];
+        var feature_fields = ['FormattedID','Name','Notes','ConversationPost',
+            this.featureRecommendationDropdownField, this.initiativeRecommendationDropdownField, this.winnerField];
         
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
             models: ['portfolioitem/theme'],
@@ -55,7 +58,7 @@ Ext.define('CustomApp', {
     _updateData: function(initiative) {
         var me = this;
         
-        var feature_fields = ['FormattedID','Name','Notes',this.recommendationDropdownField, this.winnerField, this.recommendationSummaryField];
+        var feature_fields = ['FormattedID','Name','Notes',this.featureRecommendationDropdownField, this.winnerField, this.recommendationSummaryField];
         var feature_filter = [{property:'Parent.ObjectID', value:initiative.get('ObjectID')}];
         
         this._loadATypeWithAPromise('portfolioitem/feature',feature_fields, feature_filter ).then({
@@ -90,19 +93,34 @@ Ext.define('CustomApp', {
     },
     
     _getColumns: function() {
+        var me = this;
         var columns = [
             {dataIndex:'Name', text:'name'},
-            {dataIndex:this.recommendationDropdownField, text:'Recommendation', 
+            {dataIndex:this.featureRecommendationDropdownField, text:'Recommendation', 
                 renderer: function(value,meta,record){
-                    if ( value == "Abandon" ) {
-                        meta.tdCls = "red";
-                    }
-                    if ( value == "Explore" ) {
-                        meta.tdCls = "yellow";
-                    }
-                    if ( value == "Exploit" ) {
-                        meta.tdCls = "green";
-                    }
+                    if ( record.get("_type") == "portfolioitem/feature") {
+                        if ( value == "Abandon" ) {
+                            meta.tdCls = "red";
+                        }
+                        if ( value == "Explore" ) {
+                            meta.tdCls = "yellow";
+                        }
+                        if ( value == "Exploit" ) {
+                            meta.tdCls = "green";
+                        }
+                    } 
+                    
+                    if ( record.get("_type") == "portfolioitem/initiative") {
+                        value = record.get(me.initiativeRecommendationDropdownField);
+                        
+                        if ( value == "Pivot" ) {
+                            meta.tdCls = "darkred";
+                        }
+
+                        if ( value == "Persevere" ) {
+                            meta.tdCls = "darkgreen";
+                        }
+                    } 
                     return value;
                 }
             },
@@ -185,7 +203,7 @@ Ext.define('CustomApp', {
                 { 
                     xtype: 'container', 
                     cls: 'notes_recommendation',
-                    html: "Recomendation: " + record.get(me.recommendationDropdownField) 
+                    html: "Recomendation: " + record.get(me.featureRecommendationDropdownField) 
                 },
                 {
                     xtype:  'container',

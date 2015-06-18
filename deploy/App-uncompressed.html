@@ -10,9 +10,11 @@
                 Ext.define('CustomApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
-    recommendationDropdownField: 'c_Recommendation',
+    featureRecommendationDropdownField: 'c_Recommendation',
+    initiativeRecommendationDropdownField: 'c_InitiativeRecommendation',
     recommendationSummaryField: 'c_RecommendationSummary',
     winnerField: 'c_Winner',
+    voteField: 'c_Votes',
     items: [
         {xtype:'container',itemId:'selector_box', padding: 10},
         {xtype:'container',itemId:'display_box', padding: 10}
@@ -20,7 +22,8 @@
     
     launch: function() {
         var me = this;
-        var feature_fields = ['FormattedID','Name','Notes','ConversationPost',this.recommendationDropdownField, this.winnerField];
+        var feature_fields = ['FormattedID','Name','Notes','ConversationPost',
+            this.featureRecommendationDropdownField, this.initiativeRecommendationDropdownField, this.winnerField];
         
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
             models: ['portfolioitem/theme'],
@@ -64,7 +67,7 @@
     _updateData: function(initiative) {
         var me = this;
         
-        var feature_fields = ['FormattedID','Name','Notes',this.recommendationDropdownField, this.winnerField, this.recommendationSummaryField];
+        var feature_fields = ['FormattedID','Name','Notes',this.featureRecommendationDropdownField, this.winnerField, this.recommendationSummaryField];
         var feature_filter = [{property:'Parent.ObjectID', value:initiative.get('ObjectID')}];
         
         this._loadATypeWithAPromise('portfolioitem/feature',feature_fields, feature_filter ).then({
@@ -99,19 +102,34 @@
     },
     
     _getColumns: function() {
+        var me = this;
         var columns = [
             {dataIndex:'Name', text:'name'},
-            {dataIndex:this.recommendationDropdownField, text:'Recommendation', 
+            {dataIndex:this.featureRecommendationDropdownField, text:'Recommendation', 
                 renderer: function(value,meta,record){
-                    if ( value == "Abandon" ) {
-                        meta.tdCls = "red";
-                    }
-                    if ( value == "Explore" ) {
-                        meta.tdCls = "yellow";
-                    }
-                    if ( value == "Exploit" ) {
-                        meta.tdCls = "green";
-                    }
+                    if ( record.get("_type") == "portfolioitem/feature") {
+                        if ( value == "Abandon" ) {
+                            meta.tdCls = "red";
+                        }
+                        if ( value == "Explore" ) {
+                            meta.tdCls = "yellow";
+                        }
+                        if ( value == "Exploit" ) {
+                            meta.tdCls = "green";
+                        }
+                    } 
+                    
+                    if ( record.get("_type") == "portfolioitem/initiative") {
+                        value = record.get(me.initiativeRecommendationDropdownField);
+                        
+                        if ( value == "Pivot" ) {
+                            meta.tdCls = "darkred";
+                        }
+
+                        if ( value == "Persevere" ) {
+                            meta.tdCls = "darkgreen";
+                        }
+                    } 
                     return value;
                 }
             },
@@ -194,7 +212,7 @@
                 { 
                     xtype: 'container', 
                     cls: 'notes_recommendation',
-                    html: "Recomendation: " + record.get(me.recommendationDropdownField) 
+                    html: "Recomendation: " + record.get(me.featureRecommendationDropdownField) 
                 },
                 {
                     xtype:  'container',
@@ -287,6 +305,28 @@
   color: black;
   background: #f6f6f6;
   background: linear-gradient(to bottom, #f6f6f6 0%, #e4e4e4 100%);
+}
+.rally-grid .x-grid-row-summary > .darkred > .x-grid-cell-inner,
+.rally-grid .darkred > .x-grid-cell-inner {
+  border: 1px solid #fff;
+  border-radius: 4px;
+  margin: 2px;
+  padding: 4px 0 !important;
+  text-align: center !important;
+  color: black;
+  background: #fff;
+  background: linear-gradient(to bottom, #ff0000 0%, #f1b0b8 100%);
+}
+.rally-grid .x-grid-row-summary > .darkgreen > .x-grid-cell-inner,
+.rally-grid .darkgreen > .x-grid-cell-inner {
+  border: 1px solid #b8d7be;
+  border-radius: 4px;
+  margin: 2px;
+  padding: 4px 0 !important;
+  text-align: center !important;
+  color: black;
+  background: #c5eecd;
+  background: linear-gradient(to bottom, #006400 0%, #b8d7be 100%);
 }
 .notes_recommendation {
   font-family: ProximaNovaSemiBold,Helvetica,Arial;
