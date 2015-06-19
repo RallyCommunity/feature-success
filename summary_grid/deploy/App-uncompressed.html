@@ -269,17 +269,30 @@
                             var columns = me._getColumns();
                             var check_index = column_index - 5;
                             if (check_index > 0 ) {
-                                if ( columns[check_index].dataIndex == "Notes" ) { 
+                                var column = columns[check_index];
+                                
+                                if ( column.dataIndex == "Notes" ) { 
                                     me._showNotesPopup(record);
                                 }
-                                if ( columns[check_index].dataIndex == "ObjectID" ) {
+                                if ( column.dataIndex == "ObjectID" ) {
                                     // using objectID to put a chart icon on there
                                     if ( Ext.util.Format.lowercase(record.get('_type')) == 'portfolioitem/initiative' ) {
                                         me._showInitiativeFlow(record);
                                     }
                                 }
+                                
+                                if ( column.dataIndex == me.voteField ) {
+                                    // using objectID to put a chart icon on there                                    
+                                    if ( Ext.util.Format.lowercase(record.get('_type')) == 'portfolioitem/feature' ) {
+                                        if ( column.voteIndex == "up" ) {
+                                            me._changeVote(record,me.voteField,1);
+                                        } 
+                                        if ( column.voteIndex == "down") {
+                                            me._changeVote(record,me.voteField,-1);
+                                        }
+                                    }
+                                }
                             }
-                            
                             
                         },
                         scope : this
@@ -406,6 +419,33 @@
                     return "";
                 }
             },
+            {dataIndex:'Discussion', width: 35, text:''},
+            {dataIndex:this.voteField, width: 35, text: '', editor: false, voteIndex: 'up', 
+                renderer: function(value,meta,record){
+                    if ( Ext.util.Format.lowercase(record.get('_type')) == "portfolioitem/feature" ) {
+                        if ( /\//.test(value) ) {
+                            var vote_array = value.split(/\//);
+                            var vote = vote_array[0];
+                            return "<span class='icon-thumbs-up'> </span>" + vote;
+                        }
+                        return "<span class='icon-thumbs-up'> </span>";
+                    }
+                    return "";
+                }
+            },
+            {dataIndex:this.voteField, width: 35, text: '', editor: false, voteIndex: 'down', 
+                renderer: function(value,meta,record){
+                    if ( Ext.util.Format.lowercase(record.get('_type')) == "portfolioitem/feature" ) {
+                        if ( /\//.test(value) ) {
+                            var vote_array = value.split(/\//);
+                            var vote = vote_array[1];
+                            return "<span class='icon-thumbs-down'> </span>" + vote;
+                        }
+                        return "<span class='icon-thumbs-down'> </span>";
+                    }
+                    return "";
+                }
+            },
             {dataIndex: 'ObjectID', text:' ', width: 25, editor: false, 
                 renderer: function(value,meta,record) {
                     if ( Ext.util.Format.lowercase(record.get('_type')) == "portfolioitem/initiative" ) {
@@ -422,7 +462,6 @@
                     return "";
                 }
             },
-            {dataIndex:'Discussion', width: 35, text:''},
             {dataIndex: this.recommendationSummaryField, text: 'Summary' }
         ];
         
@@ -484,12 +523,29 @@
         };
         
         Ext.create('Rally.technicalservices.ChartPopper', {
-            field: this.initiativeRecommendationDropdownField,
             width         : Ext.getBody().getWidth() - 25,
             height        : Ext.getBody().getHeight() - 25,
             parentRecord  : record,
             field         : this.featureRecommendationDropdownField,
             title         : 'Learning Flow: ' + record.get('FormattedID') + ": " + record.get('Name')
+        }).show();
+    },
+    
+    _showVotingDialog: function(record) {
+        var me = this;
+        var title = "Voting for " + record.get('FormattedID') + ": " + record.get('Name');
+        
+        Ext.create('Rally.technicalservices.VotePopper', {
+            title     : title,
+            width     : Ext.getBody().getWidth() - 25,
+            height    : Ext.getBody().getHeight() - 25,
+           
+            closable  : true,
+            
+            record    : record,
+            voteField : this.voteField,
+            context   : this.getContext()
+            
         }).show();
     },
     
@@ -545,6 +601,30 @@
                 html: record.get(field_name)
             }]
         }).show();
+    },
+    
+    _changeVote: function(record,vote_field,direction) {
+        var votes = record.get(vote_field) || "0/0";
+        if ( !/\//.test(votes) ) {
+            console.log("Changing vote field from ", votes, " to 0/0");
+            votes = "0/0";
+        }
+        
+        var vote_array = votes.split(/\//);
+        var votes_up = parseInt(vote_array[0],10);
+        var votes_down = parseInt(vote_array[1],10);
+        
+        if ( direction > 0 ) {
+            votes_up += 1;
+        }
+        
+        if ( direction < 0 ) {
+            votes_down += 1;
+        }
+        
+        record.set(vote_field, votes_up + "/" + votes_down);
+        record.save(); // todo
+        
     }
 });
 
