@@ -24,7 +24,7 @@ NOTE:  This app requires several custom fields:
     * Flag to trophy for winners
     * App Settings for choosing fields
     * Drop-down editable for Initiative, not just Feature
-    * Voting
+    * Voting restricted to once per user
 
 ## License
 

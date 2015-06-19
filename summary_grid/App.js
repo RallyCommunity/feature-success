@@ -37,7 +37,7 @@ Ext.define('CustomApp', {
                                 var column = columns[check_index];
                                 
                                 if ( column.dataIndex == "Notes" ) { 
-                                    me._showNotesPopup(record);
+                                    me._showNotesPopup(record,item);
                                 }
                                 if ( column.dataIndex == "ObjectID" ) {
                                     // using objectID to put a chart icon on there
@@ -57,6 +57,7 @@ Ext.define('CustomApp', {
                                         }
                                     }
                                 }
+                                
                             }
                             
                         },
@@ -292,7 +293,8 @@ Ext.define('CustomApp', {
             height        : Ext.getBody().getHeight() - 25,
             parentRecord  : record,
             field         : this.featureRecommendationDropdownField,
-            title         : 'Learning Flow: ' + record.get('FormattedID') + ": " + record.get('Name')
+            title         : 'Learning Flow: ',
+            chartTitle    : record.get('FormattedID') + ": " + record.get('Name')
         }).show();
     },
     
@@ -314,34 +316,28 @@ Ext.define('CustomApp', {
         }).show();
     },
     
-    _showNotesPopup: function(record) {
+    _showNotesPopup: function(record,htmlElement) {
         var me = this;
-        var title = record.get('FormattedID') + ": " + record.get('Name');
-        
-        var magic_renderer = function(field,value,meta_data,record){
-            return me._magicRenderer(field,value,meta_data,record);
-        };
-        
-        Ext.create('Rally.ui.dialog.Dialog', {
-            id        : 'fieldPopup',
-            title     : title,
-            width     : Ext.getBody().getWidth() - 25,
-            height    : Ext.getBody().getHeight() - 25,
-           
-            closable  : true,
-            items     : [
-                { 
-                    xtype: 'container', 
-                    cls: 'notes_recommendation',
-                    html: "Recomendation: " + record.get(me.featureRecommendationDropdownField) 
-                },
-                {
-                    xtype:  'container',
-                    cls: 'notes_with_border',
-                    html: record.get('Notes')
-                }
-            ]
-        }).show();
+        var targetEl = Ext.get(htmlElement);
+
+        if (this.popover) {
+            this.popover.destroy();
+        }
+
+        this.popover = Rally.ui.popover.PopoverFactory.bake({
+            target: targetEl,
+            field: 'Notes',
+            record: record,
+            autoShow: true,
+            offsetFromTarget: [
+                {x: 0, y: -5},
+                {x: 5, y: 0},
+                {x: 0, y: 5},
+                {x: -5, y: 0}
+            ]/*,
+            placement: this.popoverPlacement*/
+        });
+
     },
     
     _showInfoPopup: function(record, field_name) {

@@ -2,6 +2,7 @@ Ext.define('Rally.technicalservices.ChartPopper', {
     extend: 'Rally.ui.dialog.Dialog', 
     id        : 'chartPopper',
     title     : 'Learning Flow',
+    chartTitle: '',
     closable  : true,
     
     field     : null,
@@ -87,7 +88,7 @@ Ext.define('Rally.technicalservices.ChartPopper', {
                 zoomType: 'xy'
             },
             title: {
-                text: ' '
+                text: this.chartTitle
             },
             xAxis: {
                 tickmarkPlacement: 'on',

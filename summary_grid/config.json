@@ -5,6 +5,7 @@
    "sdk": "2.0",
    "javascript": [
       "../summary_chart/ProgressCalculator.js",
+      "ts_overrides.js",
       "ts_chart_popper.js",
       "ts_variable_combobox.js",
       "App.js"
