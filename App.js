@@ -13,7 +13,7 @@ Ext.define('CustomApp', {
     
     launch: function() {
         var me = this;
-        var feature_fields = ['FormattedID','Name','Notes','ConversationPost',
+        var feature_fields = ['FormattedID','Name','Notes','ConversationPost','PercentDoneByStoryCount',
             this.featureRecommendationDropdownField, this.initiativeRecommendationDropdownField, this.winnerField];
         
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
@@ -30,10 +30,12 @@ Ext.define('CustomApp', {
                     listeners: {
                         itemclick: function(view, record, item, index, evt) {
                             var column_index = view.getPositionByEvent(evt).column;
-                            console.log(column_index);
-                            if ( column_index == 8 ) { 
-                                // notes
-                                me._showNotesPopup(record);
+                            var columns = me._getColumns();
+                            var check_index = column_index - 5;
+                            if (check_index > 0 ) {
+                                if ( columns[check_index].dataIndex == "Notes" ) { 
+                                    me._showNotesPopup(record);
+                                }
                             }
                         },
                         scope : this
@@ -94,19 +96,47 @@ Ext.define('CustomApp', {
     
     _getColumns: function() {
         var me = this;
+        
+        var specialComboFunction = function(field) {
+            console.log('field', field);
+            return {
+                xtype: 'tsvariablecomboboxeditor', 
+                field: {
+                    xtype: 'rallyfieldvaluecombobox',
+                    autoExpand: true,
+                    field: field,
+                    storeConfig: {
+                        autoLoad: false
+                    }
+                }
+           }
+        };
+        
         var columns = [
             {dataIndex:'Name', text:'name'},
-            {dataIndex:this.featureRecommendationDropdownField, text:'Recommendation', 
+            {dataIndex:'PercentDoneByStoryCount', text: 'Progress' },
+            {
+                dataIndex:this.featureRecommendationDropdownField,
+                text:'Recommendation', 
+                listeners: {
+                    render: function(column) {
+                        console.log('col', column);
+                        console.log('editor', column.getEditor());
+                        return true;
+                    }
+                },
                 renderer: function(value,meta,record){
+                    
                     if ( record.get("_type") == "portfolioitem/feature") {
                         if ( value == "Abandon" ) {
-                            meta.tdCls = "red";
+                            value = "<span class='red_label right'>" + value + "</span>";
+                            //meta.tdCls = "red";
                         }
                         if ( value == "Explore" ) {
-                            meta.tdCls = "yellow";
+                            value = "<span class='yellow_label right'>" + value + "</span>";
                         }
                         if ( value == "Exploit" ) {
-                            meta.tdCls = "green";
+                            value = "<span class='green_label right'>" + value + "</span>";
                         }
                     } 
                     
@@ -114,21 +144,21 @@ Ext.define('CustomApp', {
                         value = record.get(me.initiativeRecommendationDropdownField);
                         
                         if ( value == "Pivot" ) {
-                            meta.tdCls = "darkred";
+                            value = "<span class='red_label'>" + value + "</span>";
                         }
 
                         if ( value == "Persevere" ) {
-                            meta.tdCls = "darkgreen";
+                            value = "<span class='green_label'>" + value + "</span>";
                         }
                     } 
                     return value;
                 }
             },
             {dataIndex: this.recommendationSummaryField, text: 'Summary' },
-            {dataIndex: 'Notes',text:'', width: 25, editor: false, 
+            {dataIndex: 'Notes', text:'<div class="icon-file"> </div>', width: 25, editor: false, 
                 renderer: function(value) {
                     if (value) {
-                        return "<span class='icon-comment'> </span>";
+                        return "<span class='icon-file'> </span>";
                     }
                     return "";
                 }
@@ -148,6 +178,7 @@ Ext.define('CustomApp', {
     },
     
     _displayGrid: function(records) {
+        var me = this;
         var store = Ext.create('Rally.data.custom.Store',{data: records});
         var container = this.down('#display_box');
         
@@ -159,9 +190,11 @@ Ext.define('CustomApp', {
             listeners: {
                 itemclick: function(view, record, item, index, evt) {
                     var column_index = view.getPositionByEvent(evt).column;
-                    if ( column_index == 7 ) { 
+                    var columns = me._getColumns();
+                    console.log(columns[column_index].dataIndex);
+                    if ( columns[column_index].dataIndex == "Notes" ) { 
                         // notes
-                        this._showNotesPopup(record);
+                        me._showNotesPopup(record);
                     }
                 },
                 scope : this

@@ -7,6 +7,200 @@
 
     <script type="text/javascript">
         Rally.onReady(function () {
+                Ext.define('Rally.technicalservices.VariableFieldValueComboBox', {
+        extend: 'Rally.ui.combobox.ComboBox',
+        alias: ['widget.tsvariablecombobox'],
+
+        config: {
+            /**
+             * @cfg {Rally.data.Model/String} model (required) The model containing the specified field used to populate the store.
+             * Not required if field is an instance of {Rally.data.Field}.
+             */
+            model: undefined,
+
+            /**
+             * @cfg {Rally.data.Field/String} field (required) The model's field, whose allowed values will be used to populate the store.
+             */
+            field: undefined,
+
+            /**
+             * @cfg {Object} context An object specifying the scoping settings for retrieving the specified model
+             * If not specified the values provided by {Rally.env.Environment#getContext} will be used.
+             */
+            context: undefined,
+
+            /**
+             * @cfg {Object} storeConfig A configuration object which will be passed to the underlying data store
+             */
+            storeConfig: {
+                autoLoad: true
+            },
+
+            /**
+             * @cfg {Boolean}
+             * If true, null will be used for the value of "-- No Entry --".  Otherwise, an empty string will be used.
+             */
+            useNullForNoEntryValue: false,
+
+            queryMode: 'local',
+            editable: true,
+            typeAhead: true,
+            forceSelection: true,
+            selectOnFocus: true,
+            valueField: 'value',
+            displayField: 'name',
+            ratingNoEntryString: 'None'
+        },
+
+        /**
+         * @constructor
+         */
+        constructor: function(config) {
+            if (config.field) {
+                config.field = Ext.clone(config.field);
+            }
+            this.mergeConfig(config);
+
+            this.store = Ext.create('Ext.data.Store', {
+                fields: [this.valueField, this.displayField],
+                data: []
+            });
+
+            return this.callParent([this.config]);
+        },
+
+        initComponent: function() {
+
+            this.callParent(arguments);
+
+            if(this.storeConfig && this.storeConfig.listeners) {
+                this.store.on(this.storeConfig.listeners);
+            }
+            this.on('afterrender', this._onAfterRender, this);
+
+            if (_.isString(this.model)) {
+                this._fetchModel();
+            } else if (this.storeConfig && this.storeConfig.autoLoad) {
+                // Autoload is set to false if this field is created as part of a (grid) editor.
+                // Do not load field data if this is in an editor.  Field will be loaded when showing editor.
+                if (_.isString(this.field)) {
+                    this.field = this.model.getField(this.field);
+                }
+                this._populateStore();
+            }
+        },
+
+        setValue: function(value) {
+            this.callParent([this.transformOriginalValue(value)]);
+        },
+
+        setField: function(field) {
+            if (this.field !== field || !this.store.getCount()) {
+                this.field = field;
+                this._loadStoreValues();
+            }
+        },
+
+        transformOriginalValue: function(value) {
+            var val = value;
+            if (value && value._ref) {
+                val = value._ref;
+            }
+            return val;
+        },
+
+        _fetchModel: function() {
+            Rally.data.ModelFactory.getModel({
+                context: this.context,
+                type: this.model,
+                success: this._onModelRetrieved,
+                scope: this
+            });
+        },
+
+        _onModelRetrieved: function(model) {
+            this.model = model;
+            this.field = this.model.getField(this.field);
+            this._populateStore();
+        },
+
+        _populateStore: function() {
+            if (!this.field) {
+                Ext.Error.raise('field config must be specified when creating a Rally.ui.combobox.FieldValueComboBox');
+            }
+            this._loadStoreValues();
+        },
+
+        _loadStoreValues: function() {
+            this.field.getAllowedValueStore().load({
+                requester: this,
+                callback: function(records, operation, success) {
+                    var store = this.store;
+                    if (!store) {
+                        return;
+                    }
+                    var noEntryValues = [],
+                        labelValues = _.map(
+                            _.filter(records, this._hasStringValue),
+                            this._convertAllowedValueToLabelValuePair,
+                            this
+                        );
+
+                    if (this.field.required === false) {
+                        var name = "-- No Entry --",
+                            value = "";
+                        if (this.getUseNullForNoEntryValue()) {
+                            value = null;
+                        }
+                        if (this.field.attributeDefinition.AttributeType.toLowerCase() === 'rating') {
+                            name = this.getRatingNoEntryString();
+                            value = "None";
+                        }
+                        noEntryValues.push(this._convertToLabelValuePair(name, value));
+                    }
+                    store.loadRawData(noEntryValues.concat(labelValues));
+                    store.fireEvent('load', store, store.getRange(), success);
+                },
+                scope: this
+            });
+        },
+
+        _hasStringValue: function(allowedValueObject) {
+            return allowedValueObject.get('StringValue') !== "";
+        },
+
+        _convertAllowedValueToLabelValuePair: function(allowedValueObject) {
+            var stringValue = allowedValueObject.get('StringValue');
+            ref = allowedValueObject.get('_ref');
+            return this._convertToLabelValuePair(stringValue, ref === NULL_REF ? stringValue : ref);
+        },
+
+        _convertToLabelValuePair: function(label, value) {
+            var allowedValue = {};
+            allowedValue[this.valueField] = value;
+            allowedValue[this.displayField] = label;
+            return allowedValue;
+        },
+
+        _onAfterRender: function() {
+            this._afterRender = true;
+            if(this._storeLoaded) {
+                this.fireEvent('ready', this);
+            }
+        },
+
+        onReady: function() {
+            this._storeLoaded = true;
+            if(this._afterRender) {
+                this.fireEvent('ready', this);
+            }
+        },
+
+        isEmpty: function() {
+            var value = this.getValue();
+            return _.isEmpty( value ) || value === this.getNoEntryValue();
+        }
+    });
                 Ext.define('CustomApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
@@ -22,7 +216,7 @@
     
     launch: function() {
         var me = this;
-        var feature_fields = ['FormattedID','Name','Notes','ConversationPost',
+        var feature_fields = ['FormattedID','Name','Notes','ConversationPost','PercentDoneByStoryCount',
             this.featureRecommendationDropdownField, this.initiativeRecommendationDropdownField, this.winnerField];
         
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
@@ -39,10 +233,12 @@
                     listeners: {
                         itemclick: function(view, record, item, index, evt) {
                             var column_index = view.getPositionByEvent(evt).column;
-                            console.log(column_index);
-                            if ( column_index == 8 ) { 
-                                // notes
-                                me._showNotesPopup(record);
+                            var columns = me._getColumns();
+                            var check_index = column_index - 5;
+                            if (check_index > 0 ) {
+                                if ( columns[check_index].dataIndex == "Notes" ) { 
+                                    me._showNotesPopup(record);
+                                }
                             }
                         },
                         scope : this
@@ -105,17 +301,19 @@
         var me = this;
         var columns = [
             {dataIndex:'Name', text:'name'},
-            {dataIndex:this.featureRecommendationDropdownField, text:'Recommendation', 
+            {dataIndex:'PercentDoneByStoryCount', text: 'Progress' },
+            {dataIndex:this.featureRecommendationDropdownField, editor: 'tsvariablecombobox',  text:'Recommendation', 
                 renderer: function(value,meta,record){
                     if ( record.get("_type") == "portfolioitem/feature") {
                         if ( value == "Abandon" ) {
-                            meta.tdCls = "red";
+                            value = "<span class='red_label right'>" + value + "</span>";
+                            //meta.tdCls = "red";
                         }
                         if ( value == "Explore" ) {
-                            meta.tdCls = "yellow";
+                            value = "<span class='yellow_label right'>" + value + "</span>";
                         }
                         if ( value == "Exploit" ) {
-                            meta.tdCls = "green";
+                            value = "<span class='green_label right'>" + value + "</span>";
                         }
                     } 
                     
@@ -123,11 +321,11 @@
                         value = record.get(me.initiativeRecommendationDropdownField);
                         
                         if ( value == "Pivot" ) {
-                            meta.tdCls = "darkred";
+                            value = "<span class='red_label'>" + value + "</span>";
                         }
 
                         if ( value == "Persevere" ) {
-                            meta.tdCls = "darkgreen";
+                            value = "<span class='green_label'>" + value + "</span>";
                         }
                     } 
                     return value;
@@ -157,6 +355,7 @@
     },
     
     _displayGrid: function(records) {
+        var me = this;
         var store = Ext.create('Rally.data.custom.Store',{data: records});
         var container = this.down('#display_box');
         
@@ -168,9 +367,11 @@
             listeners: {
                 itemclick: function(view, record, item, index, evt) {
                     var column_index = view.getPositionByEvent(evt).column;
-                    if ( column_index == 7 ) { 
+                    var columns = me._getColumns();
+                    console.log(columns[column_index].dataIndex);
+                    if ( columns[column_index].dataIndex == "Notes" ) { 
                         // notes
-                        this._showNotesPopup(record);
+                        me._showNotesPopup(record);
                     }
                 },
                 scope : this
@@ -262,38 +463,66 @@
         .app {
   /* Add app styles here */
 }
+.red_label {
+  border: 1px solid #F66349;
+  background-color: #F66349;
+  color: white;
+  font-family: ProximaNovaSemiBold, helvetica, sans-serif;
+  padding: 4px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+.green_label {
+  border: 1px solid #8DC63F;
+  background-color: #8DC63F;
+  color: white;
+  font-family: ProximaNovaSemiBold, helvetica, sans-serif;
+  padding: 4px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+.yellow_label {
+  border: 1px solid #F8B500;
+  background-color: #F8B500;
+  color: white;
+  font-family: ProximaNovaSemiBold, helvetica, sans-serif;
+  padding: 4px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  margin: 0px auto;
+}
 .rally-grid .x-grid-row-summary > .red > .x-grid-cell-inner,
 .rally-grid .red > .x-grid-cell-inner {
-  border: 1px solid #f1b0b8;
+  border: 1px solid #F66349;
   border-radius: 4px;
   margin: 2px;
   padding: 4px 0 !important;
   text-align: center !important;
-  color: black;
-  background: #fec6cd;
-  background: linear-gradient(to bottom, #fec6cd 0%, #f1b0b8 100%);
+  color: white;
+  text-transform: uppercase;
+  background: #F66349;
 }
 .rally-grid .x-grid-row-summary > .yellow > .x-grid-cell-inner,
 .rally-grid .yellow > .x-grid-cell-inner {
-  border: 1px solid #ebd88a;
+  border: 1px solid #FAD200;
   border-radius: 4px;
   margin: 2px;
   padding: 4px 0 !important;
   text-align: center !important;
   color: black;
-  background: #feea9b;
-  background: linear-gradient(to bottom, #feea9b 0%, #ebd88a 100%);
+  text-transform: uppercase;
+  background: #FAD200;
 }
 .rally-grid .x-grid-row-summary > .green > .x-grid-cell-inner,
 .rally-grid .green > .x-grid-cell-inner {
-  border: 1px solid #b8d7be;
+  border: 1px solid #8DC63F;
   border-radius: 4px;
   margin: 2px;
   padding: 4px 0 !important;
   text-align: center !important;
-  color: black;
-  background: #c5eecd;
-  background: linear-gradient(to bottom, #c5eecd 0%, #b8d7be 100%);
+  color: white;
+  text-transform: uppercase;
+  background: #8DC63F;
 }
 .rally-grid .x-grid-row-summary > .grey > .x-grid-cell-inner,
 .rally-grid .grey > .x-grid-cell-inner {
@@ -303,30 +532,7 @@
   padding: 4px 0 !important;
   text-align: center !important;
   color: black;
-  background: #f6f6f6;
-  background: linear-gradient(to bottom, #f6f6f6 0%, #e4e4e4 100%);
-}
-.rally-grid .x-grid-row-summary > .darkred > .x-grid-cell-inner,
-.rally-grid .darkred > .x-grid-cell-inner {
-  border: 1px solid #fff;
-  border-radius: 4px;
-  margin: 2px;
-  padding: 4px 0 !important;
-  text-align: center !important;
-  color: black;
-  background: #fff;
-  background: linear-gradient(to bottom, #ff0000 0%, #f1b0b8 100%);
-}
-.rally-grid .x-grid-row-summary > .darkgreen > .x-grid-cell-inner,
-.rally-grid .darkgreen > .x-grid-cell-inner {
-  border: 1px solid #b8d7be;
-  border-radius: 4px;
-  margin: 2px;
-  padding: 4px 0 !important;
-  text-align: center !important;
-  color: black;
-  background: #c5eecd;
-  background: linear-gradient(to bottom, #006400 0%, #b8d7be 100%);
+  background: #8DC63F;
 }
 .notes_recommendation {
   font-family: ProximaNovaSemiBold,Helvetica,Arial;
