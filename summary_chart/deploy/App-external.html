@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Success Chart</title>
+
+    <script type="text/javascript" src="https://rally1.rallydev.com/apps/2.0/sdk.js"></script>
+
+    <script type="text/javascript">
+        Rally.onReady(function () {
+                Ext.define("Rally.technicalservices.ProgressCalculator",{extend:"Rally.data.lookback.calculator.TimeSeriesCalculator",config:{fieldName:null,fieldValues:[]},constructor:function(config){this.initConfig(config),this.callParent(arguments)}});
+                Ext.define("CustomApp",{extend:"Rally.app.App",componentCls:"app",recommendationField:"c_Recommendation",model:"PortfolioItem/Feature",items:[{xtype:"container",itemId:"selector_box"},{xtype:"container",itemId:"display_box"}],launch:function(){var field=this.recommendationField,model=this.model;this._getValuesForField(model,field).then({scope:this,success:function(values){this._makeChart(model,field,values)},failure:function(msg){Ext.Msg.alert(msg)}})},_getValuesForField:function(model,field){var deferred=Ext.create("Deft.Deferred");return Rally.data.ModelFactory.getModel({type:model,success:function(model){model.getField(field).getAllowedValueStore().load({callback:function(records,operation,success){var values=Ext.Array.map(records,function(record){return record.get("StringValue")});deferred.resolve(values)}})},failure:function(msg){deferred.reject(msg)}}),deferred.promise},_makeChart:function(model,field,values){console.log(model,field,values);var container=this.down("#display_box");container.removeAll(),container.add({xtype:"rallychart",storeType:"Rally.data.lookback.SnapshotStore",storeConfig:this._getStoreConfig(model,field),calculatorType:"Rally.technicalservices.ProgressCalculator",calculatorConfig:{fieldName:field,fieldValues:values},chartConfig:this._getChartConfig()})},_getStoreConfig:function(model,field){return{find:{_TypeHierarchy:model},fetch:[field],hydrate:field,sort:{_ValidFrom:1},limit:1/0}},_getChartConfig:function(){return{chart:{zoomType:"xy"},title:{text:"Name of Chart"},xAxis:{tickmarkPlacement:"on",tickInterval:20,title:{text:"Iteration"}},yAxis:[{title:{text:"Count"}}],plotOptions:{series:{marker:{enabled:!1}},area:{stacking:"normal"}}}}});
+
+            Rally.launchApp('CustomApp', {
+                name:"Success Chart",
+	            parentRepos:""
+            });
+
+        });
+    </script>
+
+
+    <style type="text/css">
+        
+    </style>
+</head>
+<body>
+</body>
+</html>

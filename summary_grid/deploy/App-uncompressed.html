@@ -1,4 +1,239 @@
-Ext.define('CustomApp', {
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Feature Success</title>
+
+    <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
+
+    <script type="text/javascript">
+        Rally.onReady(function () {
+                Ext.define('Rally.technicalservices.ProgressCalculator', {
+    extend: 'Rally.data.lookback.calculator.TimeSeriesCalculator',
+    config: {
+        fieldName: null,
+        fieldValues: []
+    },
+
+    constructor: function(config) {
+        this.initConfig(config);
+        this.callParent(arguments);
+    },
+    
+    getMetrics: function () {
+         return Ext.Array.map(this.fieldValues, function(fieldValue) {
+            return  {
+                as: fieldValue,
+                groupByField: this.fieldName,
+                allowedValues: [fieldValue],
+                f: 'groupByCount',
+                display: 'area'
+            };
+        }, this);
+     },
+     
+     prepareCalculator: function (calculatorConfig) {
+        var config = Ext.Object.merge(calculatorConfig, {
+            granularity: this.config.granularity || this.lumenize.Time.DAY,
+            tz: this.config.timeZone,
+            holidays: this.config.holidays,
+            workDays: this._getWorkdays()
+        });
+
+        return new this.lumenize.TimeSeriesCalculator(config);
+    },
+    
+    runCalculation: function (snapshots) {
+        var calculatorConfig = this._prepareCalculatorConfig(),
+            seriesConfig = this._buildSeriesConfig(calculatorConfig);
+
+        var calculator = this.prepareCalculator(calculatorConfig);
+        calculator.addSnapshots(snapshots, this._getStartDate(snapshots), this._getEndDate(snapshots));
+
+        var chart_data = this._transformLumenizeDataToHighchartsSeries(calculator, seriesConfig);
+        
+        console.log(chart_data);
+        
+        chart_data.categories = Ext.Array.map(chart_data.categories, function(datum){
+            return " ";
+        });
+        
+        chart_data.series = this._updateColors(chart_data.series);
+        console.log(chart_data);
+        
+        return chart_data;
+    },
+    
+    _updateColors: function(chart_series) {
+        var updated_series = Ext.Array.map(chart_series, function(series) {
+            console.log(series);
+            if ( !series.name ) { series.name = 'none'; }
+            if ( series.name == 'Abandon' ) {
+                series.color = "#F66349";
+            }
+            console.log(series);
+            
+            return series;
+        });
+        
+        return updated_series;
+    }
+        
+});
+                Ext.define('Rally.technicalservices.ChartPopper', {
+    extend: 'Rally.ui.dialog.Dialog', 
+    id        : 'chartPopper',
+    title     : 'Learning Flow',
+    closable  : true,
+    
+    field     : null,
+    model     : 'PortfolioItem/Feature',
+    
+    parentRecord    : null,
+    
+    items: [{xtype:'container', itemId:'display_box'}],
+    
+    initComponent: function() {
+        this.callParent(arguments);
+        
+        var field = this.field;
+        var model = this.model;
+                
+        this._getValuesForField(model,field).then({
+            scope: this,
+            success: function(values) {
+                this._makeChart(model,field,values);
+            },
+            failure: function(msg) {
+                 Ext.Msg.alert(msg);
+            }
+        });
+
+    },
+    
+    _getValuesForField: function(model,field) {
+        var deferred = Ext.create('Deft.Deferred');
+        
+        Rally.data.ModelFactory.getModel({
+            type: model,
+            success: function(model) {
+                model.getField(field).getAllowedValueStore().load({
+                    callback: function(records, operation, success) {
+                        var values = Ext.Array.map(records, function(record) {
+                            return record.get('StringValue');
+                        });
+                        deferred.resolve(values);
+                    }
+                });
+            },
+            failure: function(msg) { deferred.reject(msg); }
+        });  
+        
+        return deferred.promise;
+    },
+    
+    _makeChart: function(model,field,values) {        
+        var container = this.down('#display_box');
+        container.removeAll();
+        
+        container.add({
+            xtype: 'rallychart',
+            storeType: 'Rally.data.lookback.SnapshotStore',
+            storeConfig: this._getStoreConfig(model,field),
+            calculatorType: 'Rally.technicalservices.ProgressCalculator',
+            calculatorConfig: {
+                fieldName: field,
+                fieldValues: values,
+                granularity: 'hour',
+                startDate: Rally.util.DateTime.add(new Date(), 'hour', -30)
+            },
+            chartConfig: this._getChartConfig(),
+            chartColors: ['#000', '#F66349','#8DC63F','#F8B500']
+        });
+    },
+    
+    _getStoreConfig: function(model,field) {
+        return { 
+            find: {
+                Parent: this.parentRecord.get('ObjectID'),
+                _TypeHierarchy: model
+            },
+            fetch: [field],
+            hydrate: [field]
+        };
+    },
+    
+    _getChartConfig: function() {
+        return {
+            chart: {
+                zoomType: 'xy'
+            },
+            title: {
+                text: ' '
+            },
+            xAxis: {
+                tickmarkPlacement: 'on',
+                tickInterval: 1
+            },
+            yAxis: [
+                {
+                    title: {
+                        text: ' '
+                    }
+                }
+            ],
+            plotOptions: {
+                series: {
+                    marker: {
+                        enabled: false
+                    }
+                },
+                area: {
+                    stacking: 'normal'
+                }
+            },
+            tooltip: { enabled: false }
+        };
+    }
+});
+
+                Ext.define('Rally.technicalservices.VariableComboBoxEditor', {
+    extend:  Ext.grid.CellEditor ,
+    alias: 'widget.tsvariablecomboboxeditor',
+
+    ignoreNoChange: true,
+
+    initComponent: function() {
+        console.log('field:', this.field);
+        
+        this.callParent(arguments);
+        this.field.on('select', this._onValueSelected, this);
+    },
+
+    getName: function() {
+        return this.field && this.field.getName();
+    },
+
+    getValue: function() {
+        return this._valueSelected ? this.callParent(arguments) : this.startValue;
+    },
+
+    _onValueSelected: function() {
+        this._valueSelected = true;
+    },
+
+    onHide: function() {
+        this.callParent(arguments);
+        delete this._valueSelected;
+        this.field.setValue('');
+    },
+
+    startEdit: function(el, value) {
+        this.field.setOriginalValue(value);
+        this.callParent(arguments);
+    }
+});
+
+                Ext.define('CustomApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
     featureRecommendationDropdownField: 'c_Recommendation',
@@ -312,3 +547,104 @@ Ext.define('CustomApp', {
         }).show();
     }
 });
+
+
+            Rally.launchApp('CustomApp', {
+                name:"Feature Success",
+	            parentRepos:""
+            });
+
+        });
+    </script>
+
+
+    <style type="text/css">
+        .app {
+  /* Add app styles here */
+}
+.red_label {
+  border: 1px solid #F66349;
+  background-color: #F66349;
+  color: white;
+  font-family: ProximaNovaSemiBold, helvetica, sans-serif;
+  padding: 4px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+.green_label {
+  border: 1px solid #8DC63F;
+  background-color: #8DC63F;
+  color: white;
+  font-family: ProximaNovaSemiBold, helvetica, sans-serif;
+  padding: 4px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+.yellow_label {
+  border: 1px solid #F8B500;
+  background-color: #F8B500;
+  color: white;
+  font-family: ProximaNovaSemiBold, helvetica, sans-serif;
+  padding: 4px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  margin: 0px auto;
+}
+.rally-grid .x-grid-row-summary > .red > .x-grid-cell-inner,
+.rally-grid .red > .x-grid-cell-inner {
+  border: 1px solid #F66349;
+  border-radius: 4px;
+  margin: 2px;
+  padding: 4px 0 !important;
+  text-align: center !important;
+  color: white;
+  text-transform: uppercase;
+  background: #F66349;
+}
+.rally-grid .x-grid-row-summary > .yellow > .x-grid-cell-inner,
+.rally-grid .yellow > .x-grid-cell-inner {
+  border: 1px solid #FAD200;
+  border-radius: 4px;
+  margin: 2px;
+  padding: 4px 0 !important;
+  text-align: center !important;
+  color: black;
+  text-transform: uppercase;
+  background: #FAD200;
+}
+.rally-grid .x-grid-row-summary > .green > .x-grid-cell-inner,
+.rally-grid .green > .x-grid-cell-inner {
+  border: 1px solid #8DC63F;
+  border-radius: 4px;
+  margin: 2px;
+  padding: 4px 0 !important;
+  text-align: center !important;
+  color: white;
+  text-transform: uppercase;
+  background: #8DC63F;
+}
+.rally-grid .x-grid-row-summary > .grey > .x-grid-cell-inner,
+.rally-grid .grey > .x-grid-cell-inner {
+  border: 1px solid #e4e4e4;
+  border-radius: 4px;
+  margin: 2px;
+  padding: 4px 0 !important;
+  text-align: center !important;
+  color: black;
+  background: #8DC63F;
+}
+.notes_recommendation {
+  font-family: ProximaNovaSemiBold,Helvetica,Arial;
+  font-size: 12px;
+  font-weight: normal;
+  line-height: 30px;
+}
+.notes_with_border {
+  border: 1px solid blue;
+}
+
+    </style>
+</head>
+<body>
+</body>
+</html>

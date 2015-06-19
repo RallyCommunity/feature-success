@@ -1,12 +1,10 @@
 {
-   "name": "Feature Success",
+   "name": "Success Chart",
    "className": "CustomApp",
    "server": "https://rally1.rallydev.com",
    "sdk": "2.0",
    "javascript": [
-      "../summary_chart/ProgressCalculator.js",
-      "ts_chart_popper.js",
-      "ts_variable_combobox.js",
+      "ProgressCalculator.js",
       "App.js"
    ],
    "css": [
